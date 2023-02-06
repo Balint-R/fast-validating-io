@@ -1,15 +1,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <numeric>
-#include <algorithm>
+#include <string>
+#include <type_traits>
 using namespace std;
 
+typedef unsigned int uint;
 typedef long long ll;
 typedef unsigned long long ull;
 typedef long double ld;
 
 const int AC = 0, WA = 1, PE = 2, IE = 4, PARTIAL = 7;
-#define FEEDBACK true
+#define FEEDBACK false
 
 template <typename... Ts> void quitf(int code, Ts... msg){
     if(code == IE || FEEDBACK) printf(msg...);
@@ -28,7 +30,7 @@ struct Input {
     bool nlFlag; // whether next whitespace group should have nl
 
     template <typename... Ts> void assertPe(bool expr, Ts... msg){if(!expr) quitf(isJudge ? IE : PE, msg...);}
-    template <typename... Ts> void assertWa(bool expr, Ts... msg){if(!expr) isJudge ? quitf(IE, msg...) : exit(WA);}
+    template <typename... Ts> void assertWa(bool expr, Ts... msg){if(!expr) quitf(isJudge ? IE : WA, msg...);}
 
     void fillBuffer(){
         if(iEnd == bufSz) buf = (char*) realloc(buf, bufSz <<= 1);
@@ -38,7 +40,7 @@ struct Input {
 
     bool isDelim(char ch){return ch <= ' ';}
     bool isSpace(char ch){return ch == '\t' || ch == '\n' || ch == '\v' || ch == '\f' || ch == '\r' || ch == ' ';}
-    bool isLineSep(char ch){return ch == '\n' || ch == '\r';}
+    bool isLineSep(char ch){return ch == '\n' || ch == '\r' || ch == -1;}
     void incPtr(int am = 1){ii += am;}
 
     char peekChar(){
@@ -80,7 +82,7 @@ struct Input {
         else nlFlag = true;
     }
 
-    Input(FILE *inFile, int defaultBufSize = 5 << 20) : file(inFile), bufSz(defaultBufSize), ii(), nlFlag() {
+    Input(FILE *inFile, int defaultBufSize = 5 << 20) : file(inFile), ii(), bufSz(defaultBufSize), nlFlag() {
         buf = (char*) malloc(bufSz);
         assertIe(buf, "Bad alloc");
         iEnd = fread(buf, 1, bufSz, file);
@@ -97,17 +99,16 @@ struct Input {
         if constexpr(!isIdentical) while(isSpace(peekChar())) incPtr();
     }
 
-    template <typename T = ll, typename U = ull>
-    requires(is_integral_v<T> && is_integral_v<U> && is_unsigned_v<U> && sizeof(U) >= sizeof(T))
+    template <typename T = ll, typename U = ull> requires(is_integral_v<T> && is_unsigned_v<U> && sizeof(U) >= sizeof(T))
     T readInt(T minValid = numeric_limits<T>::min(), T maxValid = numeric_limits<T>::max()){
         if constexpr(!isIdentical) eatSpace();
         bool sign = false;
         if constexpr(is_signed_v<T>) sign = peekChar() == '-', incPtr(sign);
 
         if(peekChar() == '0'){
-            assertPe(!sign && isDelim(peekChar()), "Invalid integer");
-            assertWa(0 >= minValid && 0 <= maxValid, "Integer starting with 0 out of bounds");
             incPtr();
+            assertPe(!sign && isDelim(peekChar()), "Invalid integer");
+            assertWa(0 >= minValid && 0 <= maxValid, "Integer out of bounds");
             return 0;
         }
 
@@ -121,9 +122,7 @@ struct Input {
         }
 
         if constexpr(!is_same_v<T, U>) assertPe(x <= (U) numeric_limits<T>::max() + sign, "Integer overflow");
-        T res;
-        if constexpr(is_signed_v<T>) res = sign ? -x : x; // safe since C++20
-        else res = x;
+        T res = is_signed_v<T> ? (sign ? -x : x) : x; // safe since C++20
         assertWa(res >= minValid && res <= maxValid, "Integer out of bounds");
         return res;
     }
@@ -139,14 +138,14 @@ struct Input {
         if(peekChar() == '0') res = 0;
         else {
             assertPe(peekChar() >= '0' && peekChar() <= '9', "Invalid float");
-            res = getchar()-'0';
+            res = getChar()-'0';
             while(peekChar() >= '0' && peekChar() <= '9') res = res*10 + (getChar()-'0');
         }
 
         int prec = 0;
         if(peekChar() == '.'){
             incPtr();
-            for(T pw = (T) 1/10; peekChar() >= '0' && peekChar() <= '9'; pw /= 10, prec++) res += (getchar()-'0')*pw;
+            for(T pw = (T) 1/10; peekChar() >= '0' && peekChar() <= '9'; pw /= 10, prec++) res += (getChar()-'0')*pw;
             assertPe(prec, "Invalid float");
         }
         assertPe(reqPrec < 0 || reqPrec == prec, "Float must have exactly %d digits after the decimal", reqPrec);
@@ -159,15 +158,16 @@ struct Input {
         if constexpr(!isIdentical) eatSpace();
         int beg = ii;
         while(!isDelim(peekChar())) incPtr();
-        return {buf + beg, ii - beg};
+        return {buf+beg, uint(ii-beg)};
     }
 
     string readLine(){
         if constexpr(!isIdentical) eatSpace();
         int beg = ii;
-        while(peekChar() >= ' ') incPtr();
+        while(!isLineSep(peekChar())) incPtr();
+        uint len = ii - beg;
         readNl();
-        return {buf + beg, ii - beg};
+        return {buf + beg, len};
     }
 };
 
