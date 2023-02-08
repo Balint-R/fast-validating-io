@@ -135,7 +135,7 @@ struct Input {
         bool sign = peekChar() == '-'; incPtr(sign);
 
         T res;
-        if(peekChar() == '0') res = 0;
+        if(peekChar() == '0') res = 0, incPtr();
         else {
             assertPe(peekChar() >= '0' && peekChar() <= '9', "Invalid float");
             res = getChar()-'0';
