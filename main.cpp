@@ -81,7 +81,7 @@ struct Input {
         else nlFlag = true;
     }
 
-    Input(FILE *inFile, int defaultBufSize = 5 << 20) : file(inFile), ii(), bufSz(defaultBufSize), nlFlag() {
+    Input(FILE *inFile, int defaultBufSize = 5 << 20) : file(inFile), ii(), iEnd(), bufSz(defaultBufSize), nlFlag() {
         buf = (char*) malloc(bufSz);
         assertIe(buf, "Bad alloc");
         if constexpr(!isInteractive){
