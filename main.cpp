@@ -32,12 +32,6 @@ struct Input {
     template <typename... Ts> void assertPe(bool expr, Ts... msg){if(!expr) quitf(isJudge ? IE : PE, msg...);}
     template <typename... Ts> void assertWa(bool expr, Ts... msg){if(!expr) quitf(isJudge ? IE : WA, msg...);}
 
-    void fillBuffer(){
-        if(iEnd == bufSz) buf = (char*) realloc(buf, bufSz <<= 1);
-        assertIe(buf, "Bad alloc");
-        iEnd += fread(buf + iEnd, 1, bufSz - iEnd, file);
-    }
-
     bool isDelim(char ch){return ch <= ' ';}
     bool isSpace(char ch){return ch == '\t' || ch == '\n' || ch == '\v' || ch == '\f' || ch == '\r' || ch == ' ';}
     bool isLineSep(char ch){return ch == '\n' || ch == '\r' || ch == -1;}
@@ -45,9 +39,13 @@ struct Input {
 
     char peekChar(){
         if constexpr(isInteractive){
-            while(ii == iEnd){
-                if(feof(file)) return -1;
-                fillBuffer();
+            if(feof(file)) return -1;
+            if(ii == iEnd){
+                if(iEnd == bufSz){
+                    buf = (char*) realloc(buf, bufSz <<= 1);
+                    assertIe(buf, "Bad alloc");
+                }
+                buf[iEnd++] = getc(file);
             }
         }
         return buf[ii];
@@ -63,8 +61,9 @@ struct Input {
     void eatSpace(){
         assertPe(isSpace(peekChar()) || !isDelim(peekChar()), "Less output than expected or invalid character");
         bool hasNl = false;
+        bool atStart = ii == 0;
         while(isSpace(peekChar())) hasNl |= isLineSep(getChar());
-        assertPe(hasNl == nlFlag, "Incorrect line separation");
+        assertPe(atStart || hasNl == nlFlag, "Incorrect line separation");
         nlFlag = false;
     }
 
@@ -85,18 +84,15 @@ struct Input {
     Input(FILE *inFile, int defaultBufSize = 5 << 20) : file(inFile), ii(), bufSz(defaultBufSize), nlFlag() {
         buf = (char*) malloc(bufSz);
         assertIe(buf, "Bad alloc");
-        iEnd = fread(buf, 1, bufSz, file);
-
         if constexpr(!isInteractive){
-            while(!feof(file)) fillBuffer();
-            if(iEnd == bufSz){
-                buf = (char*) realloc(buf, ++bufSz);
+            while(true){
+                iEnd += fread(buf+iEnd, 1, bufSz-iEnd-1, file);
+                if(feof(file)) break;
+                buf = (char*) realloc(buf, bufSz <<= 1);
                 assertIe(buf, "Bad alloc");
             }
             buf[iEnd] = -1;
         }
-
-        if constexpr(!isIdentical) while(isSpace(peekChar())) incPtr();
     }
 
     template <typename T = ll, typename U = ull> requires(is_integral_v<T> && is_unsigned_v<U> && sizeof(U) >= sizeof(T))
@@ -135,7 +131,7 @@ struct Input {
         bool sign = peekChar() == '-'; incPtr(sign);
 
         T res;
-        if(peekChar() == '0') res = 0, incPtr();
+        if(peekChar() == '0') res = 0;
         else {
             assertPe(peekChar() >= '0' && peekChar() <= '9', "Invalid float");
             res = getChar()-'0';
@@ -158,7 +154,7 @@ struct Input {
         if constexpr(!isIdentical) eatSpace();
         int beg = ii;
         while(!isDelim(peekChar())) incPtr();
-        return {buf+beg, uint(ii-beg)};
+        return {buf + beg, (uint) (ii - beg)};
     }
 
     string readLine(){
