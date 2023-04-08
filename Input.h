@@ -5,7 +5,7 @@
 #include <type_traits>
 
 namespace CheckerExits {
-    const int AC = 0, WA = 1, PE = 2, IE = 4, PARTIAL = 7;
+    const int AC = 0, WA = 1, PE = 2, IE = 3, PARTIAL = 7;
 
     template <typename... Ts> void quitf(int code, Ts... msg){
         if constexpr(sizeof...(msg)) printf(msg...);
