@@ -86,6 +86,8 @@ namespace Input {
             }
         }
 
+        ~Reader(){free(buf);}
+
         void readEOF(){
             if constexpr(!isIdentical) while(isSpace(peekChar())) incPtr();
             assertPe(peekChar() == -1, "More output than expected");
