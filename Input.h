@@ -7,8 +7,24 @@
 namespace CheckerExits {
     const int AC = 0, WA = 1, PE = 2, IE = 3, PARTIAL = 7;
 
-    template <typename... Ts> void quitf(int code, Ts... msg){
-        if constexpr(sizeof...(msg)) printf(msg...);
+    bool isInteractive = false;
+    const char *interactFailMsg;
+
+    // Set whether interactive mode is enabled.
+    // In interactive mode, feedback is printed to stderr instead of stdout and
+    // quitting with WA or PE prints failMsg to stdout.
+    void setInteractive(bool isInter = true, const char *failMsg = "-1\n"){
+        isInteractive = isInter;
+        interactFailMsg = failMsg;
+    }
+
+    // Exit with the given exit code.
+    // Print feedback msg to stdout, or stderr if interactive.
+    // If interactive, also print interactFailMsg to stdout if code is WA or PE.
+    template <typename... Ts>
+    void quitf(int code, Ts... msg){
+        if constexpr(sizeof...(msg)) fprintf(isInteractive ? stderr : stdout, msg...);
+        if(isInteractive && (code == WA || code == PE)) printf(interactFailMsg);
         exit(code);
     }
 
@@ -24,16 +40,45 @@ namespace Input {
     typedef long long ll;
     typedef unsigned long long ull;
 
+    /*
+    Class for reading input with ASCII codes <= 127 from a FILE*.
+    All input read is stored internally into a buffer.
+    isJudge: whether this is a validator and errors should result in an IE.
+    isIdentical: whether input should match the requested format exactly.
+        Most functions will read characters until a delimiting token is found (as by isDelim()).
+        Standard reading requires that tokens on each line match, ignoring empty lines.
+    isInteractive: whether the problem is interactive.
+        Interactive reads each character individually into the buffer using getc().
+    */
     template <bool isJudge, bool isIdentical, bool isInteractive>
     class Reader {
         FILE *file;
         char *buf;
-        int ii, iEnd, bufSz;
+        int ii, iEnd, bufSz, maxBufSz;
         bool nlFlag; // whether next whitespace group should have nl
 
     public:
         template <typename... Ts> void assertPe(bool expr, Ts... msg){if(!expr) quitf(isJudge ? IE : PE, msg...);}
         template <typename... Ts> void assertWa(bool expr, Ts... msg){if(!expr) quitf(isJudge ? IE : WA, msg...);}
+
+        Reader(FILE *inFile, int defaultBufSize = 5 << 20, int maxBufSize = 160 << 20) :
+                file(inFile), ii(), iEnd(), bufSz(defaultBufSize), maxBufSz(maxBufSize), nlFlag(){
+            buf = (char*) malloc(bufSz);
+            assertIe(buf, "Bad alloc");
+            if constexpr(!isInteractive){
+                while(true){
+                    iEnd += fread(buf+iEnd, 1, bufSz-iEnd, file);
+                    if(feof(file)) break;
+                    assertPe((bufSz <<= 1) <= maxBufSz, "Output limit exceeded");
+                    buf = (char*) realloc(buf, bufSz);
+                    assertIe(buf, "Bad alloc");
+                }
+                assertIe(iEnd < bufSz, "No space to put EOF");
+                buf[iEnd] = -1;
+            }
+        }
+
+        ~Reader(){free(buf);}
 
     private:
         bool isDelim(char ch){return ch <= ' ';}
@@ -43,10 +88,10 @@ namespace Input {
 
         char peekChar(){
             if constexpr(isInteractive){
-                if(feof(file)) return -1;
                 if(ii == iEnd){
                     if(iEnd == bufSz){
-                        buf = (char*) realloc(buf, bufSz <<= 1);
+                        assertPe((bufSz <<= 1) <= maxBufSz, "Output limit exceeded");
+                        buf = (char*) realloc(buf, bufSz);
                         assertIe(buf, "Bad alloc");
                     }
                     buf[iEnd++] = getc(file);
@@ -72,22 +117,6 @@ namespace Input {
         }
 
     public:
-        Reader(FILE *inFile, int defaultBufSize = 5 << 20) : file(inFile), ii(), iEnd(), bufSz(defaultBufSize), nlFlag() {
-            buf = (char*) malloc(bufSz);
-            assertIe(buf, "Bad alloc");
-            if constexpr(!isInteractive){
-                while(true){
-                    iEnd += fread(buf+iEnd, 1, bufSz-iEnd-1, file);
-                    if(feof(file)) break;
-                    buf = (char*) realloc(buf, bufSz <<= 1);
-                    assertIe(buf, "Bad alloc");
-                }
-                buf[iEnd] = -1;
-            }
-        }
-
-        ~Reader(){free(buf);}
-
         void readEOF(){
             if constexpr(!isIdentical) while(isSpace(peekChar())) incPtr();
             assertPe(peekChar() == -1, "More output than expected");
@@ -102,6 +131,9 @@ namespace Input {
             else nlFlag = true;
         }
 
+        // Throws PE if result does not fit in type T or is badly formatted.
+        // Throws WA if result is not in [minValid, maxValid].
+        // Uses unsigned type U internally.
         template <typename T = ll, typename U = ull> requires(is_integral_v<T> && is_unsigned_v<U> && sizeof(U) >= sizeof(T))
         T readInt(T minValid = numeric_limits<T>::min(), T maxValid = numeric_limits<T>::max()){
             if constexpr(!isIdentical) eatSpace();
@@ -129,9 +161,15 @@ namespace Input {
             assertWa(res >= minValid && res <= maxValid, "Integer out of bounds");
             return res;
         }
+
+        // If minValid and maxValid are different types, defaults to long long.
+        // Throws PE if result does not fit in long long or is badly formatted.
+        // Throws WA if result is not in [minValid, maxValid].
         template <typename T, typename U> requires (!is_same_v<T, U> || is_floating_point_v<T>)
         ll readInt(T minValid, U maxValid){return readInt<ll>((ll) minValid, (ll) maxValid);}
 
+        // Reads a float and checks that it has reqPrec digits after the decimal.
+        // reqPrec being negative indicates that any number of decimal digits will be accepted.
         template <typename T = double> requires (is_floating_point_v<T>)
         T readFloat(int reqPrec = -1){
             if constexpr(!isIdentical) eatSpace();
@@ -157,6 +195,7 @@ namespace Input {
             return sign ? -res : res;
         }
 
+        // Returns the string until the next delimiting character.
         string readStr(){
             if constexpr(!isIdentical) eatSpace();
             int beg = ii;
@@ -164,6 +203,7 @@ namespace Input {
             return {buf + beg, (uint) (ii - beg)};
         }
 
+        // Returns the string until the next newline character, consuming the newline.
         string readLine(){
             if constexpr(!isIdentical) eatSpace();
             int beg = ii;
@@ -173,6 +213,7 @@ namespace Input {
             return {buf + beg, len};
         }
 
+        // Returns the next character, eating spaces first if in not identical mode.
         char readChar(){
             if constexpr(!isIdentical) eatSpace();
             assertPe(peekChar() != -1, "Less output than expected");
