@@ -1,0 +1,4 @@
+# ignore executables, files with no extension
+*
+!/**/
+!*.*

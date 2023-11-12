@@ -46,7 +46,7 @@ namespace Input {
     isJudge: whether this is a validator and errors should result in an IE.
     isIdentical: whether input should match the requested format exactly.
         Most functions will read characters until a delimiting token is found (as by isDelim()).
-        Standard reading requires that tokens on each line match, ignoring empty lines.
+        Standard (not identical) reading requires that tokens on each line match, ignoring empty lines.
     isInteractive: whether the problem is interactive.
         Interactive reads each character individually into the buffer using getc().
     */
@@ -73,12 +73,12 @@ namespace Input {
                     buf = (char*) realloc(buf, bufSz);
                     assertIe(buf, "Bad alloc");
                 }
-                assertIe(iEnd < bufSz, "No space to put EOF");
+                assertIe(iEnd < bufSz, "No space to put EOF"); // should never trigger
                 buf[iEnd] = -1;
             }
         }
 
-        ~Reader(){free(buf);}
+        ~Reader(){free(buf);} // remove for slightly more speed
 
     private:
         bool isDelim(char ch){return ch <= ' ';}
