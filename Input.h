@@ -63,6 +63,7 @@ namespace Input {
 
         Reader(FILE *inFile, int defaultBufSize = 5 << 20, int maxBufSize = 160 << 20) :
                 file(inFile), ii(), iEnd(), bufSz(defaultBufSize), maxBufSz(maxBufSize), nlFlag(){
+            assertIe(file, "file is nullptr");
             buf = (char*) malloc(bufSz);
             assertIe(buf, "Bad alloc");
             if constexpr(!isInteractive){
