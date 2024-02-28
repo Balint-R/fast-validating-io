@@ -7,10 +7,18 @@
 namespace CheckerExits {
     const int AC = 0, WA = 1, PE = 2, IE = 3, PARTIAL = 7;
 
+    int minPointsNum, minPointsDenom;
+
+    // If non-zero, num/denom points are awarded when exiting with WA or PE.
+    void setMinPoints(int num, int denom){
+        minPointsNum = num;
+        minPointsDenom = denom;
+    }
+
     bool isInteractive = false;
     const char *interactFailMsg;
 
-    // Set whether interactive mode is enabled.
+    // Sets whether interactive mode is enabled.
     // In interactive mode, feedback is printed to stderr instead of stdout and
     // quitting with WA or PE prints failMsg to stdout.
     void setInteractive(bool isInter = true, const char *failMsg = "-1\n"){
@@ -18,13 +26,21 @@ namespace CheckerExits {
         interactFailMsg = failMsg;
     }
 
-    // Exit with the given exit code.
-    // Print feedback msg to stdout, or stderr if interactive.
-    // If interactive, also print interactFailMsg to stdout if code is WA or PE.
+    // Exits with the given exit code.
+    // Prints feedback msg to stdout, or stderr if interactive.
+    // If interactive, also prints interactFailMsg to stdout if code is WA or PE.
+    // If setMinPoints was called with a non-zero numerator, exits with PARTIAL instead of WA and PE and
+    // prints partial points in the format 'partial num/denom'.
     template <typename... Ts>
     void quitf(int code, Ts... msg){
+        if(code == WA || code == PE){
+            if(isInteractive) printf("%s", interactFailMsg);
+            if(minPointsNum){
+                code = PARTIAL;
+                fprintf(stderr, "partial %d/%d\n", minPointsNum, minPointsDenom);
+            }
+        }
         if constexpr(sizeof...(msg)) fprintf(isInteractive ? stderr : stdout, msg...);
-        if(isInteractive && (code == WA || code == PE)) printf(interactFailMsg);
         exit(code);
     }
 
@@ -63,7 +79,7 @@ namespace Input {
 
         Reader(FILE *inFile, int defaultBufSize = 5 << 20, int maxBufSize = 160 << 20) :
                 file(inFile), ii(), iEnd(), bufSz(defaultBufSize), maxBufSz(maxBufSize), nlFlag(){
-            assertIe(file, "file is nullptr");
+            assertIe(inFile, "File is nullptr");
             buf = (char*) malloc(bufSz);
             assertIe(buf, "Bad alloc");
             if constexpr(!isInteractive){
